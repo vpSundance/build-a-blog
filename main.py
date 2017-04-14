@@ -24,6 +24,11 @@ template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
 							   autoescape = True)
 
+class BlogPost(db.Model):
+	title = db.StringProperty(required = True)
+	body = db.TextProperty(required = True)
+	created = db.DateTimeProperty(auto_now_add = True)
+
 class Handler(webapp2.RequestHandler):
 	def write(self, *a, **kw):
 		self.response.out.write(*a, **kw)
@@ -37,8 +42,46 @@ class Handler(webapp2.RequestHandler):
 
 class MainHandler(Handler):
     def get(self):
-        self.response.write('Hello world!')
+        self.redirect("/blog")
+
+class BlogHandler(Handler):
+	def get(self):
+		posts = db.GqlQuery("SELECT * FROM BlogPost ORDER BY created DESC LIMIT 5")
+		self.render("blog.html", posts = posts)
+
+class NewPostHandler(Handler):
+	def get(self):
+		self.render("newpost.html")
+
+	def post(self):
+		title = self.request.get("title")
+		body = self.request.get("body")
+
+
+		if body and title:
+			p = BlogPost(title = title, body = body)
+			p.put()
+
+			self.redirect("/blog/%s" % p.key().id())
+		else:
+			error = "Title and body required."
+			self.render("newpost.html", title = title, body = body, error = error)
+
+class ViewPostHandler(Handler):
+	def get(self, id):
+		if id.isdigit():
+			post = BlogPost.get_by_id(int(id))
+		else:
+			self.redirect("/")
+
+		if post:
+			self.render("viewpost.html",post = post)
+		else:
+			self.redirect("/")
 
 app = webapp2.WSGIApplication([
-    ('/', MainHandler)
+    ('/', MainHandler),
+    ('/blog', BlogHandler),
+    ('/newpost', NewPostHandler),
+    webapp2.Route('/blog/<id:\d+>', ViewPostHandler)
 ], debug=True)
