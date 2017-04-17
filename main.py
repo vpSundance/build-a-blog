@@ -24,6 +24,10 @@ template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
 							   autoescape = True)
 
+def get_posts(limit, offset):
+	posts = db.GqlQuery("SELECT * FROM BlogPost ORDER BY created DESC LIMIT {0} OFFSET {1}".format(limit, offset))
+	return posts
+
 class BlogPost(db.Model):
 	title = db.StringProperty(required = True)
 	body = db.TextProperty(required = True)
@@ -46,7 +50,16 @@ class MainHandler(Handler):
 
 class BlogHandler(Handler):
 	def get(self):
-		posts = db.GqlQuery("SELECT * FROM BlogPost ORDER BY created DESC LIMIT 5")
+		page = self.request.get("page")
+		if page.isdigit():
+			page = int(page)
+		else:
+			page = 1
+
+		if page < 1:
+			page = 1
+			
+		posts = get_posts(5, (page - 1) * 5)
 		self.render("blog.html", posts = posts)
 
 class NewPostHandler(Handler):
